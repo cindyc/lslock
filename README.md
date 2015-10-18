@@ -1,6 +1,13 @@
 # lslock
 A program to print locked files under a directory
 
-# To run tests
+## Usage: 
+lslock <directory>
+
+
+## Running Tests
+
+```
 python setup.py install
-py.test 
+py.test
+``` 
