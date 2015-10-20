@@ -1,31 +1,53 @@
-"""A test program for lslock
+"""Tests for lslock
 """
 import os
-import fcntl
 import subprocess
+import pytest
+
 from lslock import lslock
 
-test_dir = "/tmp/lslock-test"
 
-files_to_lock = ["A/A.txt", "A/a/aa/aa.txt", "B/B.txt", "B/b/b.txt"]
+TEST_DIR = "/tmp/lslock-test"
 
 
-def setUp(): 
-    """Create the test files and lock them
+def lock_file(filepath):
+    """flock a file
     """
-    for fname in files_to_lock: 
-        fpath = os.path.join(test_dir, fname)
-	if not os.path.exists(os.path.dirname(fpath)): 
+    # run flock command to get exclusive lock on a file
+    cmd = "flock -x {0} -c cat".format(filepath)
+    subprocess.Popen(cmd.split(), stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+@pytest.fixture
+def locked():
+    """Create the test files and lock them,
+    return a list of locked files
+    """
+    locked_files = []
+    files_to_lock = ["A/A.txt",
+                     "A/a/aa/aa.txt",
+                     "B/B.txt",
+                     "B/b/b.txt"
+                     ]
+    for fname in files_to_lock:
+        fpath = os.path.join(TEST_DIR, fname)
+        # create the directory if it doesn't exist
+        if not os.path.exists(os.path.dirname(fpath)):
             os.makedirs(os.path.dirname(fpath))
-        # create the file
-        with open(fpath, "w") as f: 
-            f.write("Test file {}".format(fpath))
-        subprocess.call(["flock", "-x", "-n", filepath, "ls"])
+        # create the file if it doesn't exist
+        if not os.path.exists(fpath):
+            with open(fpath, "w") as f:
+                f.write("File {0}".format(fpath))
+        lock_file(fpath)
+        locked_files.append(fpath)
+    return (TEST_DIR, locked_files)
 
 
-def test_lock_files(): 
-    """Verify lslock program retuns locked files
+def test_lock_files(locked):
+    """Verify lslock program returns correct list of locked files
     """
-    locked = lslock.list_locks(test_dir)
-    locked_files = [lock[0] for lock in locked]
-    assert(locked_files == [os.path.join(test_dir, f) for f in files_to_lock])
+    test_dir = locked[0]
+    lslock_locks = lslock.list_locks(test_dir)
+    lslock_locked_files = [l[0] for l in lslock_locks]
+    assert(sorted(lslock_locked_files) == sorted(locked[1]))
